@@ -14,22 +14,12 @@ fn main() {
         .add_plugins(DefaultPlugins)
         // Run `fn setup` at start
         .add_startup_system(setup.system())
+        .add_startup_system(create_board.system())
         .run()
 }
 
-fn setup(
-    commands: &mut Commands,
-    mut meshes: ResMut<Assets<Mesh>>,
-    mut materials: ResMut<Assets<StandardMaterial>>,
-) {
+fn setup(commands: &mut Commands) {
     commands
-        // Create a physically rendered plane
-        .spawn(PbrBundle {
-            mesh: meshes.add(Mesh::from(shape::Plane { size: 8.0 })),
-            material: materials.add(Color::rgb(1., 0.9, 0.9).into()),
-            transform: Transform::from_translation(Vec3::new(4., 0., 4.)),
-            ..Default::default()
-        })
         // Create a 3D camera
         .spawn(Camera3dBundle {
             transform: Transform::from_matrix(
@@ -46,3 +36,36 @@ fn setup(
             ..Default::default()
         });
 }
+
+fn create_board(
+    commands: &mut Commands,
+    mut meshes: ResMut<Assets<Mesh>>,
+    mut materials: ResMut<Assets<StandardMaterial>>,
+) {
+    // Mesh used for each square, and color defs for white/black squares
+    let mesh: Handle<Mesh> = meshes.add(Mesh::from(shape::Plane { size: 1. }));
+    let white_sq: Handle<StandardMaterial> = materials.add(Color::rgb(1., 0.9, 0.9).into());
+    let black_sq: Handle<StandardMaterial> = materials.add(Color::rgb(0., 0.1, 0.1).into());
+
+    for i in 0..8 {
+        for j in 0..8 {
+            // Create mesh for a square on the board
+            commands.spawn(PbrBundle {
+                mesh: mesh.clone(),
+                material: match (i + j) % 2 {
+                    0 => white_sq.clone(),
+                    _ => black_sq.clone()
+                },
+                // Squares are of size 1; simply lay them out with loop vars as coords
+                transform: Transform::from_translation(Vec3::new(i as f32, 0., j as f32)),
+                ..Default::default()
+            });
+        }
+    };
+}
+
+fn create_pieces(
+    commands: &mut Commands,
+    asset_server: Res<AssetServer>,
+    mut materials: ResMut<Assets<StandardMaterial>>,
+)
