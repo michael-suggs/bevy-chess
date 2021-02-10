@@ -15,6 +15,7 @@ fn main() {
         // Run `fn setup` at start
         .add_startup_system(setup.system())
         .add_startup_system(create_board.system())
+        .add_startup_system(create_pieces.system())
         .run()
 }
 
@@ -68,4 +69,67 @@ fn create_pieces(
     commands: &mut Commands,
     asset_server: Res<AssetServer>,
     mut materials: ResMut<Assets<StandardMaterial>>,
-)
+) {
+    // Load all the meshes using the AssetServer.
+    // Note: the king and the knight are both separated into 2 meshes.
+    let king_handle: Handle<Mesh> =
+        asset_server.load("models/chess_kit/pieces.glb#Mesh0/Primitive0");
+    let king_cross_handle: Handle<Mesh> =
+        asset_server.load("models/chess_kit/pieces.glb#Mesh1/Primitive0");
+    let pawn_handle: Handle<Mesh> =
+        asset_server.load("models/chess_kit/pieces.glb#Mesh2/Primitive0");
+    let knight_1_handle: Handle<Mesh> =
+        asset_server.load("models/chess_kit/pieces.glb#Mesh3/Primitive0");
+    let knight_2_handle: Handle<Mesh> =
+        asset_server.load("models/chess_kit/pieces.glb#Mesh4/Primitive0");
+    let rook_handle: Handle<Mesh> =
+        asset_server.load("models/chess_kit/pieces.glb#Mesh5/Primitive0");
+    let bishop_handle: Handle<Mesh> =
+        asset_server.load("models/chess_kit/pieces.glb#Mesh6/Primitive0");
+    let queen_handle: Handle<Mesh> =
+        asset_server.load("models/chess_kit/pieces.glb#Mesh7/Primitive0");
+
+    // Defining colors for white and black pieces.
+    let white_material: Handle<StandardMaterial> =
+        materials.add(Color::rgb(1., 0.8, 0.8).into());
+    let black_material: Handle<StandardMaterial> =
+        materials.add(Color::rgb(0., 0.2, 0.2).into());
+
+    // Creating the pieces from the meshes using the colors defined above.
+    // Uses a parent entity with children to eliminate any translation
+    // present in the meshes (and combine split meshes); parent tracks
+    // actual position, and the child tracks the mesh.
+    commands
+        // Spawn parent entity (tracks actual position).
+        .spawn(PbrBundle {
+            transform: Transform::from_translation(Vec3::new(0.0, 0.0, 4.0)),
+            ..Default::default()
+        })
+        // Spawn children (combines and holds meshes).
+        .with_children(|parent| {
+            // King body mesh
+            parent.spawn(PbrBundle {
+                mesh: king_handle.clone(),
+                material: white_material.clone(),
+                // Compensate for offset
+                transform: {
+                    let mut transform = Transform::from_translation(Vec3::new(-0.2, 0., -1.9));
+                    transform.apply_non_uniform_scale(Vec3::new(0.2, 0.2, 0.2));
+                    transform
+                },
+                ..Default::default()
+            });
+            // King cross mesh
+            parent.spawn(PbrBundle {
+                mesh: king_cross_handle.clone(),
+                material: white_material.clone(),
+                // Compensate for offset
+                transform: {
+                    let mut transform = Transform::from_translation(Vec3::new(-0.2, 0., -1.9));
+                    transform.apply_non_uniform_scale(Vec3::new(0.2, 0.2, 0.2));
+                    transform
+                },
+                ..Default::default()
+            });
+        });
+}
