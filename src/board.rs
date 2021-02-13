@@ -1,4 +1,4 @@
-use bevy::prelude::*;
+use bevy::{app::AppExit, prelude::*};
 use bevy_mod_picking::*;
 use crate::pieces::*;
 
@@ -7,6 +7,7 @@ impl Plugin for BoardPlugin {
     fn build(&self, app: &mut AppBuilder) {
         app.init_resource::<SelectedSquare>()
             .init_resource::<SelectedPiece>()
+            .init_resource::<PlayerTurn>()
             .add_startup_system(create_board.system())
             .add_system(color_squares.system())
             .add_system(select_square.system());
@@ -103,8 +104,10 @@ fn select_square(
     mouse_button_inputs: Res<Input<MouseButton>>,
     mut selected_square: ResMut<SelectedSquare>,
     mut selected_piece: ResMut<SelectedPiece>,
+    mut turn: ResMut<PlayerTurn>,
+    mut app_exit_events: ResMut<Events<AppExit>>,
     squares_query: Query<&Square>,
-    mut pieces_query: Query<(Entity, &mut Piece)>,
+    mut pieces_query: Query<(Entity, &mut Piece, &Children)>,
 ) {
     if !mouse_button_inputs.just_pressed(MouseButton::Left) {
         return;
@@ -120,11 +123,48 @@ fn select_square(
             match selected_piece.entity {
                 Some(ent) => {
                     // Move piece to the selected square
-                    let pieces_vec: Vec<Piece> = pieces_query.iter_mut().map(|(_, piece)| *piece).collect();
-                    if let Ok((_piece_entity, mut piece)) = pieces_query.get_mut(ent) {
+                    let pieces_ent_vec: Vec<(Entity, Piece, Vec<Entity>)> = pieces_query
+                        .iter_mut()
+                        .map(|(entity, piece, children)| {
+                            (entity, *piece, children.iter().map(|entity| *entity).collect())
+                        })
+                        .collect();
+
+                    let pieces_vec: Vec<Piece> = pieces_query
+                        .iter_mut()
+                        .map(|(_, piece, _)| *piece)
+                        .collect();
+
+                    if let Ok((_piece_entity, mut piece, _)) = pieces_query.get_mut(ent) {
                         if piece.is_move_valid((square.x, square.y), pieces_vec) {
+                            for (other_ent, other_piece, other_children) in pieces_ent_vec {
+                                if other_piece.x == square.x
+                                    && other_piece.y == square.y
+                                    && other_piece.color != piece.color {
+                                    if other_piece.piece_type == PieceType::King {
+                                        println!(
+                                            "{} won!",
+                                            match turn.0 {
+                                                PieceColor::White => "White",
+                                                PieceColor::Black => "Black",
+                                            }
+                                        );
+                                        app_exit_events.send(AppExit);
+                                    }
+                                    commands.despawn(other_ent);
+                                    for child in other_children {
+                                        commands.despawn(child);
+                                    }
+                                }
+                            }
                             piece.x = square.x;
                             piece.y = square.y;
+
+                            // Switch players at the end of a turn
+                            turn.0 = match turn.0 {
+                                PieceColor::White => PieceColor::Black,
+                                PieceColor::Black => PieceColor::White,
+                            }
                         }
                     }
                     selected_square.entity = None;
@@ -132,10 +172,10 @@ fn select_square(
                 },
                 _ => {
                     // Select piece in the current square
-                    for (piece_entity, piece) in pieces_query.iter_mut() {
+                    for (piece_ent, piece, _) in pieces_query.iter_mut() {
                         if *piece == *square {
                             // Move piece to the selected square
-                            selected_piece.entity = Some(piece_entity);
+                            selected_piece.entity = Some(piece_ent);
                             break;
                         }
                     }
@@ -146,5 +186,12 @@ fn select_square(
         // Played clicked outside board; deselect everything.
         selected_square.entity = None;
         selected_piece.entity = None;
+    }
+}
+
+struct PlayerTurn(PieceColor);
+impl Default for PlayerTurn {
+    fn default() -> Self {
+        Self(PieceColor::White)
     }
 }
