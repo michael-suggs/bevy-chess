@@ -3,8 +3,10 @@ use bevy_mod_picking::*;
 
 mod board;
 mod pieces;
+mod ui;
 use board::*;
 use pieces::*;
+use ui::UIPlugin;
 
 fn main() {
     App::build()
@@ -22,6 +24,7 @@ fn main() {
         .add_plugin(DebugPickingPlugin)
         .add_plugin(BoardPlugin)
         .add_plugin(PiecesPlugin)
+        .add_plugin(UIPlugin)
         .add_startup_system(setup.system())
         .run()
 }
