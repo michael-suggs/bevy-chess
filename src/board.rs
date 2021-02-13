@@ -6,6 +6,7 @@ pub struct BoardPlugin;
 impl Plugin for BoardPlugin {
     fn build(&self, app: &mut AppBuilder) {
         app.init_resource::<SelectedSquare>()
+            .init_resource::<SelectedPiece>()
             .add_startup_system(create_board.system())
             .add_system(color_squares.system())
             .add_system(select_square.system());
@@ -13,7 +14,7 @@ impl Plugin for BoardPlugin {
 }
 
 // A square on the board (at position (x,y)).
-struct Square {
+pub struct Square {
     pub x: u8,
     pub y: u8,
 }
@@ -21,12 +22,6 @@ struct Square {
 impl Square {
     fn is_white(&self) -> bool {
         (self.x + self.y + 1) % 2 == 0
-    }
-}
-
-impl PartialEq<Square> for Piece {
-    fn eq(&self, other: &Square) -> bool {
-        self.x == other.x && self.y == other.y
     }
 }
 
@@ -103,6 +98,7 @@ fn color_squares(
 }
 
 fn select_square(
+    commands: &mut Commands,
     pick_state: Res<PickState>,
     mouse_button_inputs: Res<Input<MouseButton>>,
     mut selected_square: ResMut<SelectedSquare>,
@@ -124,9 +120,12 @@ fn select_square(
             match selected_piece.entity {
                 Some(ent) => {
                     // Move piece to the selected square
+                    let pieces_vec: Vec<Piece> = pieces_query.iter_mut().map(|(_, piece)| *piece).collect();
                     if let Ok((_piece_entity, mut piece)) = pieces_query.get_mut(ent) {
-                        piece.x = square.x;
-                        piece.y = square.y;
+                        if piece.is_move_valid((square.x, square.y), pieces_vec) {
+                            piece.x = square.x;
+                            piece.y = square.y;
+                        }
                     }
                     selected_square.entity = None;
                     selected_piece.entity = None;
@@ -147,5 +146,5 @@ fn select_square(
         // Played clicked outside board; deselect everything.
         selected_square.entity = None;
         selected_piece.entity = None;
-    };
+    }
 }
